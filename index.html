@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Il mondo di Laura</title>
+<meta name="theme-color" content="#f7f1e6">
+<meta name="apple-mobile-web-app-title" content="Mondo di Laura">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%8D%3C/text%3E%3C/svg%3E">
 <meta name="description" content="La mappa dei viaggi di Laura: tutti i paesi visitati, con ricordi e dettagli.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -83,6 +86,25 @@
   .trip .row b{font-family:var(--serif);font-size:1.05rem}
   .pfoot{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .saved{font-size:.85rem;color:var(--accent);min-height:1.2em;margin:4px 2px 0}
+  .eyebrow{font-family:var(--serif);font-style:italic;font-weight:500;color:var(--visit);font-size:1.25rem;margin:0 0 4px}
+  .mapcard{background:linear-gradient(180deg,#d9e8ea 0%,#c3d8dc 100%)}
+  .graticule{fill:none;stroke:rgba(255,255,255,.55);stroke-width:.5;vector-effect:non-scaling-stroke;pointer-events:none}
+  .country.want{fill:#ebc15a;stroke:#b38a22}
+  .country.want:hover{fill:#dcae3f}
+  .home circle{fill:#fff;stroke:var(--visit);stroke-width:2.5}
+  .home text{font:600 11px var(--sans);fill:#2b2a28;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin:12px 4px 0;font-size:.9rem;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .legend .sw{width:14px;height:14px;border-radius:5px;display:inline-block;border:1px solid rgba(0,0,0,.15)}
+  .legend .sw.v{background:var(--visit)} .legend .sw.w{background:#ebc15a}
+  .legend .sw.h{background:#fff;border:2.5px solid var(--visit);border-radius:50%}
+  .status.want{background:#f6e7b8;color:#7a5a12}
+  .who{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .who button{font:inherit;font-size:.88rem;border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 12px;cursor:pointer;color:var(--ink)}
+  .who button.on{background:#f7ddd5;border-color:var(--visit);color:var(--visit-dark);font-weight:600}
+  .favbtn{font:inherit;font-size:.92rem;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 13px;margin-left:8px;color:var(--muted);vertical-align:middle}
+  .favbtn.on{color:var(--visit-dark);border-color:var(--visit);background:#fdf0ec}
+  .made{font-family:var(--serif);font-style:italic;color:var(--visit-dark)}
   .sync{font-size:.88rem;color:var(--muted);padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);white-space:nowrap}
   .sync.ok{color:var(--accent)}
   .sync.warn{color:#a02d2d;border-color:#e6b9b0}
@@ -109,6 +131,7 @@
 <div class="wrap">
   <header>
     <div>
+      <p class="eyebrow" id="greet">Ciao, Laura</p>
       <h1>Il mondo di Laura</h1>
       <p class="sub">Tocca un paese sulla mappa per raccontare il tuo viaggio.</p>
     </div>
@@ -137,12 +160,24 @@
     <div class="hint">Trascina per spostarti · rotella o pizzica per ingrandire</div>
   </div>
 
+  <div class="legend">
+    <span><i class="sw v"></i>Dove sono stata</span>
+    <span><i class="sw w"></i>Mi piacerebbe andarci</span>
+    <span><i class="sw h"></i>Roma, dove tutto è cominciato ♥</span>
+  </div>
+
   <section class="listsec">
     <h2>I paesi dove sono stata</h2>
     <div class="chips" id="chips"></div>
   </section>
 
+  <section class="listsec" id="wishSec" hidden>
+    <h2>Nei miei sogni ✨</h2>
+    <div class="chips" id="wishChips"></div>
+  </section>
+
   <div class="foot">
+    <span class="made">Fatto con amore da Luca, per la mamma ♥</span>
     <span>I tuoi viaggi sono salvati online e li ritrovi da qualsiasi dispositivo.</span>
   </div>
 </div>
@@ -158,7 +193,7 @@
 </aside>
 <div id="gate"><div class="box">
   <h2>Il mondo di Laura</h2>
-  <p>Inserisci il codice che ti ha dato Luca per aprire la tua mappa.</p>
+  <p>Ciao Laura! Inserisci il codice che ti ha dato Luca per aprire la tua mappa.</p>
   <input class="field" id="gateIn" type="password" placeholder="Codice" autocomplete="current-password" aria-label="Codice">
   <div id="gateMsg"></div>
   <button class="btn primary" id="gateBtn" style="width:100%">Apri la mappa</button>
@@ -266,16 +301,23 @@
   const path=d3.geoPath(projection);
   const svg=d3.select('#map');
   const g=svg.append('g');
-  const paths=g.selectAll('path').data(features).join('path')
+  g.append('path').datum(d3.geoGraticule10()).attr('class','graticule').attr('d',path);
+  const paths=g.selectAll('path.country').data(features).join('path')
     .attr('class','country').attr('d',path)
     .attr('data-id',d=>String(d.id))
     .on('click',(e,d)=>{ if(dragged) return; openPanel(String(d.id)); })
     .on('mousemove',(e,d)=>showTip(e,d))
     .on('mouseleave',hideTip);
 
+  // Roma, dove tutto è cominciato: segnaposto che resta della stessa dimensione quando si ingrandisce
+  const homeXY=projection([12.4964,41.9028]);
+  const home=svg.append('g').attr('class','home').style('pointer-events','none').attr('transform','translate('+homeXY[0]+','+homeXY[1]+')');
+  home.append('circle').attr('r',4.5);
+  home.append('text').attr('y',-9).attr('text-anchor','middle').text('Roma ♥');
+
   const zoom=d3.zoom().scaleExtent([1,14]).translateExtent([[0,0],[W,H]]).extent([[0,0],[W,H]])
     .on('start',()=>{dragged=false})
-    .on('zoom',e=>{ if(Math.abs(e.transform.x)+Math.abs(e.transform.y)>0 && e.sourceEvent && e.sourceEvent.type==='mousemove') dragged=true; g.attr('transform',e.transform); });
+    .on('zoom',e=>{ if(Math.abs(e.transform.x)+Math.abs(e.transform.y)>0 && e.sourceEvent && e.sourceEvent.type==='mousemove') dragged=true; g.attr('transform',e.transform); const hp=e.transform.apply(homeXY); home.attr('transform','translate('+hp[0]+','+hp[1]+')'); });
   let dragged=false;
   svg.call(zoom).on('dblclick.zoom',null);
   $('#zin').onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1.6);
@@ -295,7 +337,7 @@
   const tip=$('#tip');
   function showTip(e,d){
     const ent=data[String(d.id)];
-    const sub=ent&&ent.trips&&ent.trips.length?(ent.trips.map(t=>t.when).filter(Boolean).join(' · ')):'';
+    const sub=ent&&ent.want?'Nei miei sogni ✨':ent&&ent.trips&&ent.trips.length?(ent.trips.map(t=>t.when).filter(Boolean).join(' · ')):'';
     tip.innerHTML=esc(d.properties.n)+(sub?'<br><small style="opacity:.75">'+esc(sub)+'</small>':'');
     tip.style.left=Math.min(e.clientX+14,window.innerWidth-250)+'px';
     tip.style.top=(e.clientY+14)+'px';
@@ -305,23 +347,28 @@
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
   /* ---------- aggiornamento vista ---------- */
+  const isWant=id=>!!(data[id]&&data[id].want);
+  function chipsHTML(list){
+    return list.map(id=>{
+      const e=data[id],n=(e.trips||[]).length;
+      return '<button class="chip" data-id="'+esc(id)+'">'+(e.fav?'♥ ':'')+esc(byId.get(id).properties.n)+(n>1?'<small>'+n+' viaggi</small>':'')+'</button>';
+    }).join('');
+  }
+  function bindChips(el){el.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{focusCountry(b.dataset.id);openPanel(b.dataset.id)})}
   function refresh(){
-    const ids=Object.keys(data).filter(id=>byId.has(id));
-    paths.classed('visited',d=>!!data[String(d.id)]);
+    const all=Object.keys(data).filter(id=>byId.has(id));
+    const ids=all.filter(id=>!isWant(id)),wish=all.filter(isWant);
+    const byName=(a,b)=>byId.get(a).properties.n.localeCompare(byId.get(b).properties.n,'it');
+    paths.classed('visited',d=>{const e=data[String(d.id)];return !!e&&!e.want}).classed('want',d=>isWant(String(d.id)));
     $('#count').textContent=ids.length;
     $('#countLbl').textContent=ids.length===1?'paese visitato':'paesi visitati';
     $('#pct').textContent='su '+TOTAL+' ('+Math.round(ids.length/TOTAL*100)+'%)';
     $('#barFill').style.width=Math.min(100,ids.length/TOTAL*100)+'%';
     const chips=$('#chips');
     if(!ids.length){chips.innerHTML='<span class="empty">Ancora nessuno: tocca un paese sulla mappa per cominciare!</span>';}
-    else{
-      ids.sort((a,b)=>byId.get(a).properties.n.localeCompare(byId.get(b).properties.n,'it'));
-      chips.innerHTML=ids.map(id=>{
-        const n=(data[id].trips||[]).length;
-        return '<button class="chip" data-id="'+esc(id)+'">'+esc(byId.get(id).properties.n)+(n>1?'<small>'+n+' viaggi</small>':'')+'</button>';
-      }).join('');
-      chips.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{focusCountry(b.dataset.id);openPanel(b.dataset.id)});
-    }
+    else{chips.innerHTML=chipsHTML(ids.sort(byName));bindChips(chips)}
+    $('#wishSec').hidden=!wish.length;
+    $('#wishChips').innerHTML=chipsHTML(wish.sort(byName));bindChips($('#wishChips'));
   }
 
   /* ---------- pannello paese ---------- */
@@ -342,6 +389,13 @@
   $('#pClose').onclick=closePanel;scrim.onclick=closePanel;
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&current)closePanel()});
 
+  const FAMILY=['Fernando','Luca','Andrea'];
+  const newTrip=()=>({when:'',places:'',with:'',note:''});
+  const names=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+  function syncWho(tr){
+    const cur=names(tr.querySelector('[data-k=with]').value).map(x=>x.toLowerCase());
+    tr.querySelectorAll('[data-who]').forEach(b=>b.classList.toggle('on',cur.includes(b.dataset.who.toLowerCase())));
+  }
   function renderPanel(){
     const f=byId.get(current),ent=data[current];
     $('#pTitle').textContent=f.properties.n;
@@ -349,18 +403,36 @@
     if(!ent){
       body.innerHTML='<span class="status no">Non ancora visitato</span>'+
         '<p style="margin:0 0 16px;color:var(--muted)">Ci sei stata? Segnalo sulla mappa e aggiungi i tuoi ricordi.</p>'+
-        '<div class="pfoot"><button class="btn primary" id="btnVisit">Sì, ci sono stata!</button></div>';
-      $('#btnVisit').onclick=()=>{data[current]={trips:[{when:'',places:'',note:''}]};save();refresh();renderPanel();toast('Aggiunto alla mappa ✓')};
+        '<div class="pfoot"><button class="btn primary" id="btnVisit">Sì, ci sono stata!</button>'+
+        '<button class="btn" id="btnWant">Mi piacerebbe andarci ✨</button></div>';
+      $('#btnVisit').onclick=()=>{data[current]={trips:[newTrip()]};save();refresh();renderPanel();toast('Aggiunto alla mappa ✓')};
+      $('#btnWant').onclick=()=>{data[current]={want:true,wantNote:''};save();refresh();renderPanel();toast('Aggiunto ai tuoi sogni ✨')};
       return;
     }
-    if(!ent.trips||!ent.trips.length) ent.trips=[{when:'',places:'',note:''}];
-    let html='<span class="status yes">Visitato ✓</span>';
+    if(ent.want){
+      body.innerHTML='<span class="status want">Nei miei sogni ✨</span>'+
+        '<div class="trip"><label>Perché ti piacerebbe andarci?</label>'+
+        '<textarea class="field" data-wn rows="3" placeholder="Cosa sogni di vedere o fare?">'+esc(ent.wantNote)+'</textarea></div>'+
+        '<div class="saved" id="saved"></div>'+
+        '<div class="pfoot"><button class="btn primary" id="btnGone">Ci sono stata!</button>'+
+        '<button class="btn ghost danger" id="btnRemove">Togli dai sogni</button></div>';
+      body.querySelector('[data-wn]').addEventListener('input',e=>{data[current].wantNote=e.target.value;save()});
+      $('#btnGone').onclick=()=>{data[current]={trips:[newTrip()]};save();refresh();renderPanel();toast('Un sogno realizzato! ✓')};
+      $('#btnRemove').onclick=()=>{delete data[current];save();refresh();renderPanel();toast('Tolto dai sogni')};
+      return;
+    }
+    if(!ent.trips||!ent.trips.length) ent.trips=[newTrip()];
+    let html='<span class="status yes">Visitato ✓</span>'+
+      '<button class="favbtn'+(ent.fav?' on':'')+'" id="btnFav">'+(ent.fav?'♥ Tra i miei preferiti':'♡ Aggiungi ai preferiti')+'</button>'+
+      '<div style="height:14px"></div>';
     ent.trips.forEach((t,i)=>{
       html+='<div class="trip" data-i="'+i+'">'+
         '<div class="row"><b>'+(ent.trips.length>1?'Viaggio '+(i+1):'Il mio viaggio')+'</b>'+
         (ent.trips.length>1?'<button class="btn ghost danger" data-del="'+i+'" style="min-height:34px;padding:4px 10px">Elimina</button>':'')+'</div>'+
         '<label>Quando</label><input class="field" data-k="when" placeholder="es. Estate 2019" value="'+esc(t.when)+'">'+
         '<label>Luoghi visti</label><input class="field" data-k="places" placeholder="es. Rio, Salvador, Iguazú" value="'+esc(t.places)+'">'+
+        '<label>Con chi</label><input class="field" data-k="with" placeholder="es. Fernando, Luca" value="'+esc(t.with)+'">'+
+        '<div class="who">'+FAMILY.map(n=>'<button type="button" data-who="'+n+'">'+n+'</button>').join('')+'</div>'+
         '<label>Ricordi e note</label><textarea class="field" data-k="note" rows="3" placeholder="Cosa ti è rimasto nel cuore?">'+esc(t.note)+'</textarea>'+
       '</div>';
     });
@@ -369,19 +441,28 @@
       '<button class="btn ghost danger" id="btnRemove">Togli dai paesi visitati</button></div>';
     body.innerHTML=html;
 
+    body.querySelectorAll('.trip').forEach(syncWho);
     body.querySelectorAll('.trip .field').forEach(inp=>{
       inp.addEventListener('input',()=>{
-        const i=+inp.closest('.trip').dataset.i;
+        const tr=inp.closest('.trip'),i=+tr.dataset.i;
         data[current].trips[i][inp.dataset.k]=inp.value;
+        if(inp.dataset.k==='with')syncWho(tr);
         save();
         refresh();
       });
     });
+    body.querySelectorAll('[data-who]').forEach(b=>b.onclick=()=>{
+      const inp=b.closest('.trip').querySelector('[data-k=with]');
+      const list=names(inp.value),k=list.findIndex(x=>x.toLowerCase()===b.dataset.who.toLowerCase());
+      if(k>=0)list.splice(k,1);else list.push(b.dataset.who);
+      inp.value=list.join(', ');inp.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    $('#btnFav').onclick=()=>{data[current].fav=!data[current].fav;save();refresh();renderPanel()};
     body.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
       if(!confirm('Eliminare questo viaggio?'))return;
       data[current].trips.splice(+b.dataset.del,1);save();refresh();renderPanel();
     });
-    $('#btnAdd').onclick=()=>{data[current].trips.push({when:'',places:'',note:''});save();renderPanel();
+    $('#btnAdd').onclick=()=>{data[current].trips.push(newTrip());save();renderPanel();
       const f=body.querySelectorAll('.trip');const last=f[f.length-1];last.scrollIntoView({behavior:'smooth',block:'center'});last.querySelector('.field').focus()};
     $('#btnRemove').onclick=()=>{
       if(!confirm('Togliere '+byId.get(current).properties.n+' dai paesi visitati? Si perderanno anche i ricordi che hai scritto.'))return;
@@ -402,6 +483,11 @@
   $('#search').addEventListener('change',doSearch);
   $('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doSearch()}});
 
+  (function greet(){
+    const d=new Date(),h=d.getHours();
+    let t=h<5?'Ciao':h<13?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera';
+    $('#greet').textContent=(d.getMonth()===11&&d.getDate()===27)?'Buon compleanno, Laura! 🎂🎉':t+', Laura';
+  })();
   refresh();
   init();
 })();
