@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il mondo di Laura</title>
+<meta name="description" content="La mappa dei viaggi di Laura: tutti i paesi visitati, con ricordi e dettagli.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f1e6; --card:#fffdf8; --ink:#2b2a28; --muted:#7a7468; --line:#e5dccb;
+    --ocean:#cfe0e3; --land:#f3ead7; --land-stroke:#c4b89f;
+    --visit:#c8553d; --visit-dark:#a8412c; --accent:#2f5d62;
+    --serif:'Fraunces',Georgia,'Times New Roman',serif;
+    --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.5;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 56px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:20px}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5vw,46px);line-height:1.08;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:6px 0 0;font-size:1.02rem}
+  .counter{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 18px}
+  .counter .num{font-family:var(--serif);font-weight:700;font-size:2.4rem;line-height:1;color:var(--visit)}
+  .counter .lbl{font-size:.9rem;color:var(--muted);line-height:1.25}
+  .bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px;width:130px}
+  .bar i{display:block;height:100%;background:var(--visit);width:0;transition:width .4s}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:center}
+  .search{flex:1 1 260px;position:relative}
+  .search input{width:100%;font:inherit;padding:13px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .search input:focus,.field:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .btn{font:inherit;font-weight:500;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:12px 16px;border-radius:14px;min-height:46px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--visit);border-color:var(--visit);color:#fff}
+  .btn.primary:hover{background:var(--visit-dark)}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+  .btn.danger{color:#a02d2d}
+
+  .mapcard{position:relative;background:var(--ocean);border-radius:22px;border:1px solid var(--line);overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.02),0 12px 30px -18px rgba(47,93,98,.35)}
+  svg#map{display:block;width:100%;height:auto;touch-action:none;cursor:grab}
+  svg#map:active{cursor:grabbing}
+  .country{fill:var(--land);stroke:var(--land-stroke);stroke-width:.6;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill .15s}
+  .country:hover{fill:#e8d9b8}
+  .country.visited{fill:var(--visit);stroke:#8e3220}
+  .country.visited:hover{fill:var(--visit-dark)}
+  .country.selected{stroke:#222;stroke-width:1.8}
+  .zoom{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+  .zoom button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:22px;cursor:pointer;color:var(--ink)}
+  .zoom button:hover{border-color:var(--accent)}
+  .hint{position:absolute;left:14px;bottom:12px;background:rgba(255,253,248,.9);border-radius:10px;padding:6px 12px;font-size:.86rem;color:var(--muted)}
+  #tip{position:fixed;pointer-events:none;background:#2b2a28;color:#fff;padding:6px 11px;border-radius:9px;font-size:.9rem;opacity:0;transition:opacity .1s;z-index:30;max-width:240px}
+
+  .listsec{margin-top:26px}
+  .listsec h2{font-family:var(--serif);font-size:1.45rem;margin:0 0 12px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font:inherit;font-size:.95rem;cursor:pointer;border:1px solid var(--line);background:var(--card);padding:7px 14px;border-radius:99px}
+  .chip:hover{border-color:var(--visit);color:var(--visit-dark)}
+  .chip small{color:var(--muted);margin-left:6px}
+  .empty{color:var(--muted);font-style:italic}
+  .foot{margin-top:34px;color:var(--muted);font-size:.88rem;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+
+  /* pannello */
+  #scrim{position:fixed;inset:0;background:rgba(30,25,20,.28);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+  #scrim.on{opacity:1;pointer-events:auto}
+  aside#panel{position:fixed;z-index:50;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--card);border-left:1px solid var(--line);box-shadow:-20px 0 50px -30px rgba(0,0,0,.4);transform:translateX(102%);transition:transform .25s ease;display:flex;flex-direction:column}
+  aside#panel.open{transform:none}
+  .phead{padding:22px 22px 12px;display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+  .phead h3{font-family:var(--serif);font-size:1.8rem;line-height:1.12;margin:0}
+  .phead .x{font-size:26px;line-height:1;border:none;background:none;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:10px}
+  .pbody{padding:0 22px 22px;overflow:auto;flex:1}
+  .status{display:inline-block;font-size:.85rem;font-weight:600;border-radius:99px;padding:3px 11px;margin-bottom:14px}
+  .status.yes{background:#f7ddd5;color:var(--visit-dark)}
+  .status.no{background:#eee7d8;color:var(--muted)}
+  .trip{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;background:#fffefb}
+  .trip label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+  .trip label:first-child{margin-top:0}
+  .field{width:100%;font:inherit;padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);resize:vertical}
+  .trip .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .trip .row b{font-family:var(--serif);font-size:1.05rem}
+  .pfoot{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .saved{font-size:.85rem;color:var(--accent);min-height:1.2em;margin:4px 2px 0}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#2b2a28;color:#fff;padding:11px 18px;border-radius:12px;opacity:0;transition:all .25s;z-index:60;font-size:.95rem;max-width:90vw}
+  #toast.on{opacity:1;transform:translateX(-50%)}
+
+  @media (max-width:720px){
+    body{font-size:16px}
+    .wrap{padding:20px 14px 48px}
+    aside#panel{top:auto;left:0;right:0;width:100%;max-height:86vh;border-left:none;border-top:1px solid var(--line);border-radius:22px 22px 0 0;transform:translateY(102%)}
+    aside#panel.open{transform:none}
+    .hint{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Il mondo di Laura</h1>
+      <p class="sub">Tocca un paese sulla mappa per raccontare il tuo viaggio.</p>
+    </div>
+    <div class="counter" aria-live="polite">
+      <div class="num" id="count">0</div>
+      <div class="lbl"><span id="countLbl">paesi visitati</span><br><span id="pct">su 195</span>
+        <div class="bar"><i id="barFill"></i></div></div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="search">
+      <input id="search" list="countries" placeholder="Cerca un paese per nome (utile per quelli piccoli)…" autocomplete="off" aria-label="Cerca un paese">
+      <datalist id="countries"></datalist>
+    </div>
+    <button class="btn" id="btnExport" title="Scarica una copia di sicurezza dei tuoi viaggi">Scarica backup</button>
+    <button class="btn" id="btnImport" title="Ripristina da un backup">Carica backup</button>
+    <input type="file" id="fileIn" accept="application/json,.json" hidden>
+  </div>
+
+  <div class="mapcard">
+    <svg id="map" viewBox="0 0 1000 520" role="img" aria-label="Mappa del mondo interattiva"></svg>
+    <div class="zoom">
+      <button id="zin" aria-label="Ingrandisci">+</button>
+      <button id="zout" aria-label="Riduci">−</button>
+      <button id="zreset" aria-label="Vista intera" style="font-size:16px">⤢</button>
+    </div>
+    <div class="hint">Trascina per spostarti · rotella o pizzica per ingrandire</div>
+  </div>
+
+  <section class="listsec">
+    <h2>I paesi dove sono stata</h2>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <div class="foot">
+    <span>I dati restano salvati su questo dispositivo, in questo browser. Ogni tanto scarica un backup per sicurezza.</span>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="scrim"></div>
+<aside id="panel" aria-hidden="true" aria-label="Dettagli paese">
+  <div class="phead">
+    <h3 id="pTitle"></h3>
+    <button class="x" id="pClose" aria-label="Chiudi">×</button>
+  </div>
+  <div class="pbody" id="pBody"></div>
+</aside>
+<div id="toast"></div>
+
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/world.js"></script>
+<script>
+(function(){
+  const STORE='laura-world-map-v1';
+  const TOTAL=195;
+  const $=s=>document.querySelector(s);
+
+  /* ---------- dati ---------- */
+  let storageOK=true;
+  function load(){
+    try{const v=JSON.parse(localStorage.getItem(STORE));return v&&typeof v==='object'?v:{}}
+    catch(e){storageOK=false;return {}}
+  }
+  let data=load();
+  let toastT;
+  function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
+  function save(){
+    try{localStorage.setItem(STORE,JSON.stringify(data));return true}
+    catch(e){storageOK=false;toast('Non riesco a salvare su questo browser. Scarica un backup!');return false}
+  }
+  if(!storageOK) setTimeout(()=>toast('Attenzione: il salvataggio automatico non è disponibile qui.'),600);
+
+  /* ---------- mappa ---------- */
+  const topo=window.WORLD_TOPO;
+  const features=topojson.feature(topo,topo.objects.countries).features.filter(f=>String(f.id)!=='010'); // senza Antartide
+  const byId=new Map(features.map(f=>[String(f.id),f]));
+  const W=1000,H=520;
+  const projection=d3.geoNaturalEarth1().fitExtent([[6,6],[W-6,H-6]],{type:'FeatureCollection',features});
+  const path=d3.geoPath(projection);
+  const svg=d3.select('#map');
+  const g=svg.append('g');
+  const paths=g.selectAll('path').data(features).join('path')
+    .attr('class','country').attr('d',path)
+    .attr('data-id',d=>String(d.id))
+    .on('click',(e,d)=>{ if(dragged) return; openPanel(String(d.id)); })
+    .on('mousemove',(e,d)=>showTip(e,d))
+    .on('mouseleave',hideTip);
+
+  const zoom=d3.zoom().scaleExtent([1,14]).translateExtent([[0,0],[W,H]]).extent([[0,0],[W,H]])
+    .on('start',()=>{dragged=false})
+    .on('zoom',e=>{ if(Math.abs(e.transform.x)+Math.abs(e.transform.y)>0 && e.sourceEvent && e.sourceEvent.type==='mousemove') dragged=true; g.attr('transform',e.transform); });
+  let dragged=false;
+  svg.call(zoom).on('dblclick.zoom',null);
+  $('#zin').onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1.6);
+  $('#zout').onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1/1.6);
+  $('#zreset').onclick=()=>svg.transition().duration(350).call(zoom.transform,d3.zoomIdentity);
+
+  function focusCountry(id){
+    const f=byId.get(id); if(!f) return;
+    const [[x0,y0],[x1,y1]]=path.bounds(f);
+    const dx=x1-x0,dy=y1-y0,cx=(x0+x1)/2,cy=(y0+y1)/2;
+    const k=Math.max(1,Math.min(8,0.5/Math.max(dx/W,dy/H)));
+    const t=d3.zoomIdentity.translate(W/2,H/2).scale(k).translate(-cx,-cy);
+    svg.transition().duration(500).call(zoom.transform,t);
+  }
+
+  /* tooltip */
+  const tip=$('#tip');
+  function showTip(e,d){
+    const ent=data[String(d.id)];
+    const sub=ent&&ent.trips&&ent.trips.length?(ent.trips.map(t=>t.when).filter(Boolean).join(' · ')):'';
+    tip.innerHTML=esc(d.properties.n)+(sub?'<br><small style="opacity:.75">'+esc(sub)+'</small>':'');
+    tip.style.left=Math.min(e.clientX+14,window.innerWidth-250)+'px';
+    tip.style.top=(e.clientY+14)+'px';
+    tip.style.opacity=1;
+  }
+  function hideTip(){tip.style.opacity=0}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+  /* ---------- aggiornamento vista ---------- */
+  function refresh(){
+    const ids=Object.keys(data).filter(id=>byId.has(id));
+    paths.classed('visited',d=>!!data[String(d.id)]);
+    $('#count').textContent=ids.length;
+    $('#countLbl').textContent=ids.length===1?'paese visitato':'paesi visitati';
+    $('#pct').textContent='su '+TOTAL+' ('+Math.round(ids.length/TOTAL*100)+'%)';
+    $('#barFill').style.width=Math.min(100,ids.length/TOTAL*100)+'%';
+    const chips=$('#chips');
+    if(!ids.length){chips.innerHTML='<span class="empty">Ancora nessuno: tocca un paese sulla mappa per cominciare!</span>';}
+    else{
+      ids.sort((a,b)=>byId.get(a).properties.n.localeCompare(byId.get(b).properties.n,'it'));
+      chips.innerHTML=ids.map(id=>{
+        const n=(data[id].trips||[]).length;
+        return '<button class="chip" data-id="'+esc(id)+'">'+esc(byId.get(id).properties.n)+(n>1?'<small>'+n+' viaggi</small>':'')+'</button>';
+      }).join('');
+      chips.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{focusCountry(b.dataset.id);openPanel(b.dataset.id)});
+    }
+  }
+
+  /* ---------- pannello paese ---------- */
+  let current=null;
+  const panel=$('#panel'),scrim=$('#scrim');
+  function openPanel(id){
+    if(!byId.has(id)) return;
+    current=id;
+    paths.classed('selected',d=>String(d.id)===id);
+    renderPanel();
+    panel.classList.add('open');scrim.classList.add('on');panel.setAttribute('aria-hidden','false');
+    hideTip();
+  }
+  function closePanel(){
+    panel.classList.remove('open');scrim.classList.remove('on');panel.setAttribute('aria-hidden','true');
+    paths.classed('selected',false);current=null;
+  }
+  $('#pClose').onclick=closePanel;scrim.onclick=closePanel;
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&current)closePanel()});
+
+  function renderPanel(){
+    const f=byId.get(current),ent=data[current];
+    $('#pTitle').textContent=f.properties.n;
+    const body=$('#pBody');
+    if(!ent){
+      body.innerHTML='<span class="status no">Non ancora visitato</span>'+
+        '<p style="margin:0 0 16px;color:var(--muted)">Ci sei stata? Segnalo sulla mappa e aggiungi i tuoi ricordi.</p>'+
+        '<div class="pfoot"><button class="btn primary" id="btnVisit">Sì, ci sono stata!</button></div>';
+      $('#btnVisit').onclick=()=>{data[current]={trips:[{when:'',places:'',note:''}]};save();refresh();renderPanel();toast('Aggiunto alla mappa ✓')};
+      return;
+    }
+    if(!ent.trips||!ent.trips.length) ent.trips=[{when:'',places:'',note:''}];
+    let html='<span class="status yes">Visitato ✓</span>';
+    ent.trips.forEach((t,i)=>{
+      html+='<div class="trip" data-i="'+i+'">'+
+        '<div class="row"><b>'+(ent.trips.length>1?'Viaggio '+(i+1):'Il mio viaggio')+'</b>'+
+        (ent.trips.length>1?'<button class="btn ghost danger" data-del="'+i+'" style="min-height:34px;padding:4px 10px">Elimina</button>':'')+'</div>'+
+        '<label>Quando</label><input class="field" data-k="when" placeholder="es. Estate 2019" value="'+esc(t.when)+'">'+
+        '<label>Luoghi visti</label><input class="field" data-k="places" placeholder="es. Rio, Salvador, Iguazú" value="'+esc(t.places)+'">'+
+        '<label>Ricordi e note</label><textarea class="field" data-k="note" rows="3" placeholder="Cosa ti è rimasto nel cuore?">'+esc(t.note)+'</textarea>'+
+      '</div>';
+    });
+    html+='<div class="saved" id="saved"></div><div class="pfoot">'+
+      '<button class="btn" id="btnAdd">+ Aggiungi un altro viaggio</button>'+
+      '<button class="btn ghost danger" id="btnRemove">Togli dai paesi visitati</button></div>';
+    body.innerHTML=html;
+
+    body.querySelectorAll('.trip .field').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        const i=+inp.closest('.trip').dataset.i;
+        data[current].trips[i][inp.dataset.k]=inp.value;
+        if(save()){$('#saved').textContent='Salvato ✓';}
+        refresh();
+      });
+    });
+    body.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+      if(!confirm('Eliminare questo viaggio?'))return;
+      data[current].trips.splice(+b.dataset.del,1);save();refresh();renderPanel();
+    });
+    $('#btnAdd').onclick=()=>{data[current].trips.push({when:'',places:'',note:''});save();renderPanel();
+      const f=body.querySelectorAll('.trip');const last=f[f.length-1];last.scrollIntoView({behavior:'smooth',block:'center'});last.querySelector('.field').focus()};
+    $('#btnRemove').onclick=()=>{
+      if(!confirm('Togliere '+byId.get(current).properties.n+' dai paesi visitati? Si perderanno anche i ricordi che hai scritto.'))return;
+      delete data[current];save();refresh();renderPanel();toast('Tolto dai visitati');
+    };
+  }
+
+  /* ---------- ricerca ---------- */
+  const dl=$('#countries');
+  dl.innerHTML=[...features].sort((a,b)=>a.properties.n.localeCompare(b.properties.n,'it')).map(f=>'<option value="'+esc(f.properties.n)+'">').join('');
+  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  function doSearch(){
+    const q=norm($('#search').value); if(!q) return;
+    let f=features.find(f=>norm(f.properties.n)===q||norm(f.properties.e)===q);
+    if(!f){const m=features.filter(f=>norm(f.properties.n).includes(q)||norm(f.properties.e).includes(q));if(m.length===1)f=m[0];}
+    if(f){focusCountry(String(f.id));openPanel(String(f.id));$('#search').value='';$('#search').blur()}
+  }
+  $('#search').addEventListener('change',doSearch);
+  $('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doSearch()}});
+
+  /* ---------- backup ---------- */
+  $('#btnExport').onclick=()=>{
+    const blob=new Blob([JSON.stringify({app:'mondo-di-laura',version:1,data},null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='viaggi-laura-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('Backup scaricato ✓');
+  };
+  $('#btnImport').onclick=()=>$('#fileIn').click();
+  $('#fileIn').addEventListener('change',async e=>{
+    const file=e.target.files[0];e.target.value='';if(!file)return;
+    try{
+      const j=JSON.parse(await file.text());
+      const incoming=j&&j.data&&typeof j.data==='object'?j.data:null;
+      if(!incoming||j.app!=='mondo-di-laura')throw new Error('formato');
+      const n=Object.keys(incoming).filter(id=>byId.has(id)).length;
+      if(!confirm('Il backup contiene '+n+' paesi. Sostituire i dati attuali con quelli del backup?'))return;
+      data=incoming;save();refresh();closePanel();toast('Backup ripristinato ✓');
+    }catch(err){toast('Questo file non sembra un backup valido.')}
+  });
+
+  refresh();
+})();
+</script>
+</body>
+</html>
