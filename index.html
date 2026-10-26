@@ -124,9 +124,6 @@
       <input id="search" list="countries" placeholder="Cerca un paese per nome (utile per quelli piccoli)…" autocomplete="off" aria-label="Cerca un paese">
       <datalist id="countries"></datalist>
     </div>
-    <button class="btn" id="btnExport" title="Scarica una copia di sicurezza dei tuoi viaggi">Scarica backup</button>
-    <button class="btn" id="btnImport" title="Ripristina da un backup">Carica backup</button>
-    <input type="file" id="fileIn" accept="application/json,.json" hidden>
     <span class="sync" id="sync" role="status">Connessione…</span>
   </div>
 
@@ -146,7 +143,7 @@
   </section>
 
   <div class="foot">
-    <span>I tuoi viaggi sono salvati online e li ritrovi da qualsiasi dispositivo. Ogni tanto puoi scaricare anche un backup: è una copia di sicurezza in più.</span>
+    <span>I tuoi viaggi sono salvati online e li ritrovi da qualsiasi dispositivo.</span>
   </div>
 </div>
 
@@ -197,7 +194,7 @@
     lsSet(CACHE,JSON.stringify(data));
     if(!cloud){
       setSync(storageOK?'Solo su questo dispositivo':'Non salvato!','warn');
-      if(!storageOK)toast('Non riesco a salvare. Scarica un backup!');
+      if(!storageOK)toast('Non riesco a salvare su questo dispositivo.');
       return storageOK;
     }
     dirty=true;setSync('Salvataggio…');clearTimeout(pushT);pushT=setTimeout(push,700);return true;
@@ -404,27 +401,6 @@
   }
   $('#search').addEventListener('change',doSearch);
   $('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doSearch()}});
-
-  /* ---------- backup ---------- */
-  $('#btnExport').onclick=()=>{
-    const blob=new Blob([JSON.stringify({app:'mondo-di-laura',version:1,data},null,2)],{type:'application/json'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-    a.download='viaggi-laura-'+new Date().toISOString().slice(0,10)+'.json';
-    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-    toast('Backup scaricato ✓');
-  };
-  $('#btnImport').onclick=()=>$('#fileIn').click();
-  $('#fileIn').addEventListener('change',async e=>{
-    const file=e.target.files[0];e.target.value='';if(!file)return;
-    try{
-      const j=JSON.parse(await file.text());
-      const incoming=j&&j.data&&typeof j.data==='object'?j.data:null;
-      if(!incoming||j.app!=='mondo-di-laura')throw new Error('formato');
-      const n=Object.keys(incoming).filter(id=>byId.has(id)).length;
-      if(!confirm('Il backup contiene '+n+' paesi. Sostituire i dati attuali con quelli del backup?'))return;
-      data=incoming;save();refresh();closePanel();toast('Backup ripristinato ✓');
-    }catch(err){toast('Questo file non sembra un backup valido.')}
-  });
 
   refresh();
   init();
