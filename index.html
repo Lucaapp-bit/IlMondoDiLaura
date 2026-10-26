@@ -22,12 +22,12 @@
   *{box-sizing:border-box}
   html,body{margin:0}
   body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.5;-webkit-text-size-adjust:100%}
-  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 56px}
-  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:20px}
-  h1{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5vw,46px);line-height:1.08;margin:0;letter-spacing:-.01em}
+  .wrap{max-width:1600px;margin:0 auto;padding:16px 20px 48px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:12px}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(26px,3.4vw,38px);line-height:1.08;margin:0;letter-spacing:-.01em}
   .sub{color:var(--muted);margin:6px 0 0;font-size:1.02rem}
-  .counter{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 18px}
-  .counter .num{font-family:var(--serif);font-weight:700;font-size:2.4rem;line-height:1;color:var(--visit)}
+  .counter{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:8px 16px}
+  .counter .num{font-family:var(--serif);font-weight:700;font-size:2rem;line-height:1;color:var(--visit)}
   .counter .lbl{font-size:.9rem;color:var(--muted);line-height:1.25}
   .bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px;width:130px}
   .bar i{display:block;height:100%;background:var(--visit);width:0;transition:width .4s}
@@ -105,6 +105,15 @@
   .favbtn{font:inherit;font-size:.92rem;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 13px;margin-left:8px;color:var(--muted);vertical-align:middle}
   .favbtn.on{color:var(--visit-dark);border-color:var(--visit);background:#fdf0ec}
   .made{font-family:var(--serif);font-style:italic;color:var(--visit-dark)}
+  .mapcard{height:clamp(380px,calc(100vh - 140px),880px);height:clamp(380px,calc(100svh - 140px),880px)}
+  svg#map{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .maptools{position:absolute;left:12px;top:12px;right:68px;display:flex;gap:8px;z-index:2;pointer-events:none}
+  .maptools>*{pointer-events:auto}
+  .maptools .search{flex:0 1 400px}
+  .maptools .search input{box-shadow:0 6px 18px -8px rgba(0,0,0,.3);border-color:transparent}
+  .legend .sync{margin-left:auto}
+  @media (min-width:721px){#scrim{display:none}}
+  @media (max-width:720px){.mapcard{height:clamp(380px,70vh,720px);height:clamp(380px,70svh,720px)}.legend .sync{margin-left:0}}
   .sync{font-size:.88rem;color:var(--muted);padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);white-space:nowrap}
   .sync.ok{color:var(--accent)}
   .sync.warn{color:#a02d2d;border-color:#e6b9b0}
@@ -131,7 +140,7 @@
 <div class="wrap">
   <header>
     <div>
-      <p class="eyebrow" id="greet">Ciao, Laura</p>
+      <p class="eyebrow" id="greet" hidden></p>
       <h1>Il mondo di Laura</h1>
       <p class="sub">Tocca un paese sulla mappa per raccontare il tuo viaggio.</p>
     </div>
@@ -142,28 +151,26 @@
     </div>
   </header>
 
-  <div class="toolbar">
+  <div class="mapcard">
+    <svg id="map" role="img" aria-label="Mappa del mondo interattiva"></svg>
+    <div class="maptools">
     <div class="search">
       <input id="search" list="countries" placeholder="Cerca un paese per nome (utile per quelli piccoli)…" autocomplete="off" aria-label="Cerca un paese">
       <datalist id="countries"></datalist>
     </div>
-    <span class="sync" id="sync" role="status">Connessione…</span>
-  </div>
-
-  <div class="mapcard">
-    <svg id="map" viewBox="0 0 1000 520" role="img" aria-label="Mappa del mondo interattiva"></svg>
+    </div>
     <div class="zoom">
       <button id="zin" aria-label="Ingrandisci">+</button>
       <button id="zout" aria-label="Riduci">−</button>
       <button id="zreset" aria-label="Vista intera" style="font-size:16px">⤢</button>
     </div>
-    <div class="hint">Trascina per spostarti · rotella o pizzica per ingrandire</div>
   </div>
 
   <div class="legend">
     <span><i class="sw v"></i>Dove sono stata</span>
     <span><i class="sw w"></i>Mi piacerebbe andarci</span>
     <span><i class="sw h"></i>Roma, dove tutto è cominciato ♥</span>
+    <span class="sync" id="sync" role="status">Connessione…</span>
   </div>
 
   <section class="listsec">
@@ -296,41 +303,75 @@
   const topo=window.WORLD_TOPO;
   const features=topojson.feature(topo,topo.objects.countries).features.filter(f=>String(f.id)!=='010'); // senza Antartide
   const byId=new Map(features.map(f=>[String(f.id),f]));
-  const W=1000,H=520;
-  const projection=d3.geoNaturalEarth1().fitExtent([[6,6],[W-6,H-6]],{type:'FeatureCollection',features});
+  const FC={type:'FeatureCollection',features};
+  const HOME=[12.4964,41.9028]; // Roma
+  const card=$('.mapcard');
+  let W=1000,H=520,pad=8,k0=1,homeXY=[0,0],mapBox=[[0,0],[1000,520]];
+  const projection=d3.geoNaturalEarth1();
   const path=d3.geoPath(projection);
   const svg=d3.select('#map');
   const g=svg.append('g');
-  g.append('path').datum(d3.geoGraticule10()).attr('class','graticule').attr('d',path);
+  const grat=g.append('path').datum(d3.geoGraticule10()).attr('class','graticule');
   const paths=g.selectAll('path.country').data(features).join('path')
-    .attr('class','country').attr('d',path)
+    .attr('class','country')
     .attr('data-id',d=>String(d.id))
     .on('click',(e,d)=>{ if(dragged) return; openPanel(String(d.id)); })
     .on('mousemove',(e,d)=>showTip(e,d))
     .on('mouseleave',hideTip);
 
   // Roma, dove tutto è cominciato: segnaposto che resta della stessa dimensione quando si ingrandisce
-  const homeXY=projection([12.4964,41.9028]);
-  const home=svg.append('g').attr('class','home').style('pointer-events','none').attr('transform','translate('+homeXY[0]+','+homeXY[1]+')');
-  home.append('circle').attr('r',4.5);
-  home.append('text').attr('y',-9).attr('text-anchor','middle').text('Roma ♥');
+  const home=svg.append('g').attr('class','home').style('pointer-events','none');
+  home.append('circle').attr('r',5);
+  home.append('text').attr('y',-10).attr('text-anchor','middle').text('Roma ♥');
 
-  const zoom=d3.zoom().scaleExtent([1,14]).translateExtent([[0,0],[W,H]]).extent([[0,0],[W,H]])
-    .on('start',()=>{dragged=false})
-    .on('zoom',e=>{ if(Math.abs(e.transform.x)+Math.abs(e.transform.y)>0 && e.sourceEvent && e.sourceEvent.type==='mousemove') dragged=true; g.attr('transform',e.transform); const hp=e.transform.apply(homeXY); home.attr('transform','translate('+hp[0]+','+hp[1]+')'); });
-  let dragged=false;
+  let dragged=false,sx=0,sy=0;
+  const zoom=d3.zoom().scaleExtent([1,16])
+    .on('start',e=>{dragged=false;const s=e.sourceEvent;if(s){const p=s.touches&&s.touches[0]?s.touches[0]:s;sx=p.clientX;sy=p.clientY}})
+    .on('zoom',e=>{
+      const s=e.sourceEvent;
+      if(s&&s.type!=='wheel'){const p=s.touches&&s.touches[0]?s.touches[0]:s;if(p&&Math.hypot(p.clientX-sx,p.clientY-sy)>6)dragged=true}
+      g.attr('transform',e.transform);
+      const hp=e.transform.apply(homeXY);home.attr('transform','translate('+hp[0]+','+hp[1]+')');
+    });
   svg.call(zoom).on('dblclick.zoom',null);
+  const constrain=t=>zoom.constrain()(t,[[0,0],[W,H]],[[0,0],[W,H]]);
+  // vista iniziale: intera su schermi larghi; su telefono la mappa riempie lo schermo, centrata su Roma
+  function homeView(){
+    const cy=(mapBox[0][1]+mapBox[1][1])/2;
+    return constrain(d3.zoomIdentity.translate(W/2-k0*homeXY[0],H/2-k0*cy).scale(k0));
+  }
+  function layout(){
+    const r=card.getBoundingClientRect();
+    W=Math.max(280,Math.round(r.width));H=Math.max(240,Math.round(r.height));
+    svg.attr('viewBox','0 0 '+W+' '+H);
+    pad=Math.round(Math.min(W,H)*0.015)+4;
+    projection.fitExtent([[pad,pad],[W-pad,H-pad]],FC);
+    paths.attr('d',path);grat.attr('d',path);
+    homeXY=projection(HOME);
+    mapBox=path.bounds(FC);
+    zoom.extent([[0,0],[W,H]]).translateExtent([[0,0],[W,H]]);
+    const mh=mapBox[1][1]-mapBox[0][1];
+    k0=(W/H<1.45)?Math.min(4,Math.max(1,(H-2*pad)/mh)):1;
+    svg.call(zoom.transform,homeView());
+  }
   $('#zin').onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1.6);
   $('#zout').onclick=()=>svg.transition().duration(250).call(zoom.scaleBy,1/1.6);
-  $('#zreset').onclick=()=>svg.transition().duration(350).call(zoom.transform,d3.zoomIdentity);
+  $('#zreset').onclick=()=>svg.transition().duration(350).call(zoom.transform,homeView());
 
   function focusCountry(id){
     const f=byId.get(id); if(!f) return;
     const [[x0,y0],[x1,y1]]=path.bounds(f);
     const dx=x1-x0,dy=y1-y0,cx=(x0+x1)/2,cy=(y0+y1)/2;
-    const k=Math.max(1,Math.min(8,0.5/Math.max(dx/W,dy/H)));
-    const t=d3.zoomIdentity.translate(W/2,H/2).scale(k).translate(-cx,-cy);
-    svg.transition().duration(500).call(zoom.transform,t);
+    const k=Math.max(1,Math.min(8,0.45/Math.max(dx/W,dy/H)));
+    svg.transition().duration(500).call(zoom.transform,constrain(d3.zoomIdentity.translate(W/2,H/2).scale(k).translate(-cx,-cy)));
+  }
+  layout();
+  if(window.ResizeObserver){
+    let rt,lw=card.getBoundingClientRect().width,lh=card.getBoundingClientRect().height;
+    new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>{
+      const r=card.getBoundingClientRect();
+      if(Math.abs(r.width-lw)>2||Math.abs(r.height-lh)>40){lw=r.width;lh=r.height;layout()}
+    },150)}).observe(card);
   }
 
   /* tooltip */
@@ -483,10 +524,9 @@
   $('#search').addEventListener('change',doSearch);
   $('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doSearch()}});
 
-  (function greet(){
-    const d=new Date(),h=d.getHours();
-    let t=h<5?'Ciao':h<13?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera';
-    $('#greet').textContent=(d.getMonth()===11&&d.getDate()===27)?'Buon compleanno, Laura! 🎂🎉':t+', Laura';
+  (function bday(){
+    const d=new Date();
+    if(d.getMonth()===11&&d.getDate()===27){const el=$('#greet');el.textContent='Buon compleanno, Laura! 🎂🎉';el.hidden=false}
   })();
   refresh();
   init();
