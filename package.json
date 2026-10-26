@@ -1,0 +1,9 @@
+{
+  "name": "il-mondo-di-laura",
+  "private": true,
+  "version": "1.0.0",
+  "description": "La mappa dei viaggi di Laura",
+  "dependencies": {
+    "@vercel/blob": "^2.8.2"
+  }
+}

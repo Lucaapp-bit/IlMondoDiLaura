@@ -83,6 +83,16 @@
   .trip .row b{font-family:var(--serif);font-size:1.05rem}
   .pfoot{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .saved{font-size:.85rem;color:var(--accent);min-height:1.2em;margin:4px 2px 0}
+  .sync{font-size:.88rem;color:var(--muted);padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);white-space:nowrap}
+  .sync.ok{color:var(--accent)}
+  .sync.warn{color:#a02d2d;border-color:#e6b9b0}
+  #gate{position:fixed;inset:0;background:rgba(247,241,230,.96);z-index:70;display:none;align-items:center;justify-content:center;padding:20px}
+  #gate.on{display:flex}
+  #gate .box{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px;max-width:400px;width:100%;box-shadow:0 20px 50px -30px rgba(0,0,0,.4)}
+  #gate h2{font-family:var(--serif);margin:0 0 8px;font-size:1.7rem}
+  #gate p{margin:0 0 16px;color:var(--muted)}
+  #gate .field{margin-bottom:12px}
+  #gateMsg{color:#a02d2d;min-height:1.3em;margin:0 0 8px;font-size:.92rem}
   #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#2b2a28;color:#fff;padding:11px 18px;border-radius:12px;opacity:0;transition:all .25s;z-index:60;font-size:.95rem;max-width:90vw}
   #toast.on{opacity:1;transform:translateX(-50%)}
 
@@ -117,6 +127,7 @@
     <button class="btn" id="btnExport" title="Scarica una copia di sicurezza dei tuoi viaggi">Scarica backup</button>
     <button class="btn" id="btnImport" title="Ripristina da un backup">Carica backup</button>
     <input type="file" id="fileIn" accept="application/json,.json" hidden>
+    <span class="sync" id="sync" role="status">Connessione…</span>
   </div>
 
   <div class="mapcard">
@@ -135,7 +146,7 @@
   </section>
 
   <div class="foot">
-    <span>I dati restano salvati su questo dispositivo, in questo browser. Ogni tanto scarica un backup per sicurezza.</span>
+    <span>I tuoi viaggi sono salvati online e li ritrovi da qualsiasi dispositivo. Ogni tanto puoi scaricare anche un backup: è una copia di sicurezza in più.</span>
   </div>
 </div>
 
@@ -148,6 +159,13 @@
   </div>
   <div class="pbody" id="pBody"></div>
 </aside>
+<div id="gate"><div class="box">
+  <h2>Il mondo di Laura</h2>
+  <p>Inserisci il codice che ti ha dato Luca per aprire la tua mappa.</p>
+  <input class="field" id="gateIn" type="password" placeholder="Codice" autocomplete="current-password" aria-label="Codice">
+  <div id="gateMsg"></div>
+  <button class="btn primary" id="gateBtn" style="width:100%">Apri la mappa</button>
+</div></div>
 <div id="toast"></div>
 
 <script src="vendor/d3.min.js"></script>
@@ -159,20 +177,88 @@
   const TOTAL=195;
   const $=s=>document.querySelector(s);
 
-  /* ---------- dati ---------- */
+  /* ---------- dati: cloud (fonte di verità) + copia locale ---------- */
+  const CACHE='laura-world-map-v1', CODEKEY='laura-code-v1', API='/api/trips';
   let storageOK=true;
-  function load(){
-    try{const v=JSON.parse(localStorage.getItem(STORE));return v&&typeof v==='object'?v:{}}
-    catch(e){storageOK=false;return {}}
+  function lsGet(k){try{return localStorage.getItem(k)}catch(e){storageOK=false;return null}}
+  function lsSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){storageOK=false;return false}}
+  function loadCache(){try{const v=JSON.parse(lsGet(CACHE));return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch(e){return {}}}
+  let data=loadCache();
+  let rev=0,cloud=false,dirty=false,pushing=false,pushT=null,retryT=null,toastT;
+  function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3800)}
+  function setSync(txt,cls){const s=$('#sync');s.textContent=txt;s.className='sync '+(cls||'');const sv=$('#saved');if(sv)sv.textContent=cls==='ok'?'Salvato ✓':txt}
+  function getCode(){return lsGet(CODEKEY)||''}
+  async function api(method,body){
+    const r=await fetch(API,{method,cache:'no-store',headers:{'Content-Type':'application/json','x-access-code':getCode()},body:body?JSON.stringify(body):undefined});
+    let j=null;try{j=await r.json()}catch(e){}
+    return {status:r.status,json:j};
   }
-  let data=load();
-  let toastT;
-  function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
   function save(){
-    try{localStorage.setItem(STORE,JSON.stringify(data));return true}
-    catch(e){storageOK=false;toast('Non riesco a salvare su questo browser. Scarica un backup!');return false}
+    lsSet(CACHE,JSON.stringify(data));
+    if(!cloud){
+      setSync(storageOK?'Solo su questo dispositivo':'Non salvato!','warn');
+      if(!storageOK)toast('Non riesco a salvare. Scarica un backup!');
+      return storageOK;
+    }
+    dirty=true;setSync('Salvataggio…');clearTimeout(pushT);pushT=setTimeout(push,700);return true;
   }
-  if(!storageOK) setTimeout(()=>toast('Attenzione: il salvataggio automatico non è disponibile qui.'),600);
+  async function push(){
+    if(pushing){pushT=setTimeout(push,400);return}
+    pushing=true;clearTimeout(retryT);
+    try{
+      const snap=JSON.stringify(data);
+      const {status,json}=await api('PUT',{rev,data:JSON.parse(snap)});
+      if(status===200){
+        rev=json.rev;
+        if(JSON.stringify(data)===snap){dirty=false;setSync('Salvato online ✓','ok')}
+        else{pushT=setTimeout(push,300)}
+      }else if(status===409){
+        data=json.current.data||{};rev=json.current.rev;dirty=false;lsSet(CACHE,JSON.stringify(data));
+        if(current)closePanel();refresh();setSync('Aggiornato','ok');
+        toast('La mappa era stata modificata da un altro dispositivo: l’ho aggiornata. Rifai l’ultima modifica.');
+      }else if(status===401){dirty=true;cloud=false;setSync('Codice non valido','warn');askCode()}
+      else throw new Error('http '+status);
+    }catch(e){dirty=true;setSync('Non ancora salvato: riprovo…','warn');retryT=setTimeout(push,8000)}
+    pushing=false;
+  }
+  window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+
+  /* sincronizzazione iniziale e ritorno sulla scheda */
+  async function pull(first){
+    let res;
+    try{res=await api('GET')}catch(e){if(first)setSync('Offline: solo su questo dispositivo','warn');return false}
+    if(res.status===401){askCode();return 'auth'}
+    const j=res.json;
+    if(res.status!==200||!j||typeof j.rev!=='number'){
+      if(first)setSync(res.status===500?'Archivio online non configurato':'Solo su questo dispositivo','warn');
+      return false;
+    }
+    cloud=true;
+    if(first&&j.rev===0&&Object.keys(data).length&&!dirty){rev=0;save();return true} // porta online ciò che c'era già qui
+    if(!dirty&&(first||j.rev!==rev)){
+      data=j.data||{};rev=j.rev;lsSet(CACHE,JSON.stringify(data));refresh();
+    }
+    if(!dirty)setSync('Salvato online ✓','ok');
+    return true;
+  }
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloud&&!dirty&&!pushing&&!current)pull(false)});
+
+  /* schermata del codice */
+  function askCode(){$('#gate').classList.add('on');setTimeout(()=>$('#gateIn').focus(),50)}
+  async function submitCode(){
+    const v=$('#gateIn').value.trim();if(!v)return;
+    lsSet(CODEKEY,v);$('#gateMsg').textContent='';
+    const r=await pull(true);
+    if(r==='auth')$('#gateMsg').textContent='Il codice non è corretto, riprova.';
+    else{$('#gate').classList.remove('on');$('#gateIn').value=''}
+  }
+  $('#gateBtn').onclick=submitCode;
+  $('#gateIn').addEventListener('keydown',e=>{if(e.key==='Enter')submitCode()});
+  function init(){
+    const m=location.hash.match(/[#&]k=([^&]+)/);
+    if(m){lsSet(CODEKEY,decodeURIComponent(m[1]));try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+    pull(true);
+  }
 
   /* ---------- mappa ---------- */
   const topo=window.WORLD_TOPO;
@@ -290,7 +376,7 @@
       inp.addEventListener('input',()=>{
         const i=+inp.closest('.trip').dataset.i;
         data[current].trips[i][inp.dataset.k]=inp.value;
-        if(save()){$('#saved').textContent='Salvato ✓';}
+        save();
         refresh();
       });
     });
@@ -341,6 +427,7 @@
   });
 
   refresh();
+  init();
 })();
 </script>
 </body>
